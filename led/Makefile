@@ -9,7 +9,7 @@ VERILATOR = verilator
 #verilator options
 VERILATOR_CFLAGS += -MMD --build -cc  \
 				-O3 --x-assign fast --x-initial fast \
-				--trace
+				--trace --timing
 
 BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir

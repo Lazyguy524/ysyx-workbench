@@ -1,15 +1,22 @@
+`timescale 1ns/1ps
 module top(
   input clk,
   input rst,
-
+  input uart_rx,
+  output uart_tx,
   output [15:0] led
 );
 
-  led led_inst(
+led led_inst(
     .clk(clk),
     .rst(rst),
     .led(led)
-  );
+);
+
+uart my_uart(
+  .tx(uart_tx),
+  .rx(uart_rx)
+);
 
 endmodule
 
