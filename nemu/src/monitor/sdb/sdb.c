@@ -18,6 +18,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "sdb.h"
+#include <memory/vaddr.h>
 
 static int is_batch_mode = false;
 
@@ -55,6 +56,63 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
+static int cmd_si(char *args) {
+  int steps = 1;
+  if (args != NULL) {
+    char *endptr;
+    steps = strtol(args, &endptr, 10);
+    if (*endptr != '\0' || steps <= 0) {
+      printf("Invalid argument '%s': not a number\n", args);
+      return 0;
+    } 
+  }
+  cpu_exec(steps);
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  char *arg = strtok(NULL, " ");
+  if (arg == NULL) {
+    printf("Usage: info r or info w\n");
+  } else {
+    if (strcmp(arg, "r") == 0) {
+      isa_reg_display();
+    } else if (strcmp(arg, "w") == 0 ) {
+      /*todo*/
+    } else {
+      printf("Usage: info r or info w\n");
+    }
+  }
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  char *arg = strtok(NULL, " ");
+  char *expr = strtok(NULL, " ");
+  if (arg == NULL || expr == NULL) {
+    printf("Usage: x N EXPR\n");
+    return 0;
+  } else {
+    int N = atoi(arg);
+    if (N < 0)  {
+      printf("Invalid argument '%s': not a number\n", arg);
+    } else {
+      char *str;
+      vaddr_t addr = strtol(expr, &str, 16);
+      for(int i = 0; i < N; i++)  {
+        word_t data = vaddr_read(addr + i * 4,4);
+        printf("0x%08x: ", addr + i * 4);
+        for(int j = 0; j < 4; j++) {
+          printf("0x%02x ", data & 0xff);
+          data >>= 8;
+        }
+        printf("\n");
+      }
+    }
+  }
+  return 0;
+}
+
 static struct {
   const char *name;
   const char *description;
@@ -63,6 +121,9 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
+  { "si", "Usage : si N ,Step N instaruction exactly", cmd_si },
+  { "info", "Usage info r or info w ,Display the states of functions", cmd_info },
+  { "x", "Usage: x N EXPR. Scan the memory from EXPR by N bytes", cmd_x },
 
   /* TODO: Add more commands */
 
