@@ -113,6 +113,21 @@ static int cmd_x(char *args) {
   return 0;
 }
 
+static int cmd_p(char *args){
+  
+  // char *arg = strtok(NULL, " ");
+  // while (arg != NULL)
+  // {
+  //   printf("get the input arg:%s",arg);
+  //   bool *success = 0;
+  //   expr(arg,success);
+  //   arg = strtok(NULL," ");
+  // }
+  bool *success = 0;
+  expr(args,success);
+  return 0;
+}
+
 static struct {
   const char *name;
   const char *description;
@@ -124,6 +139,7 @@ static struct {
   { "si", "Usage : si N ,Step N instaruction exactly", cmd_si },
   { "info", "Usage info r or info w ,Display the states of functions", cmd_info },
   { "x", "Usage: x N EXPR. Scan the memory from EXPR by N bytes", cmd_x },
+  { "p", "Usage: p EXPR. Caculate the value of expression", cmd_p },
 
   /* TODO: Add more commands */
 
