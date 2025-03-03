@@ -10,7 +10,10 @@
 * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 *
-* See the Mulan PSL v2 for more details.
+* See the Mulan PSL v2 for more detail    "../tools/gen-expr/input",              // 上一级目录
+    // "../../tools/gen-expr/input",           // 上两级目录
+    // "../../../tools/gen-expr/input",        // 上三级目录
+    // "/home/用户名/ysyx-workbench/nemu/tools/gen-expr/input"  // 替换为你的实际用户名s.
 ***************************************************************************************/
 
 #include <isa.h>
@@ -21,7 +24,7 @@
 #include <regex.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ,num,
+  TK_NOTYPE = 256, TK_EQ, TK_NUM,
 
   /* TODO: Add more token types */
 
@@ -44,7 +47,7 @@ static struct rule {
   {"\\/", '/'},         // div
   {"\\(", '('},         // paren_l
   {"\\)", ')'},         // paren_r
-  {"[0-9]+", num},    //num
+  {"[0-9][0-9]*", TK_NUM},   // 使用TK_NUM而不是num，保持一致性
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -81,8 +84,10 @@ static bool make_token(char *e) {
   int i;
   regmatch_t pmatch;
 
+  // 初始化tokens数组
+  memset(tokens, 0, sizeof(tokens));
   nr_token = 0;
-  int num_pot = -1;
+
   while (e[position] != '\0') {
     /* Try all rules one by one. */
     for (i = 0; i < NR_REGEX; i ++) {
@@ -94,336 +99,199 @@ static bool make_token(char *e) {
             i, rules[i].regex, position, substr_len, substr_len, substr_start);
 
         position += substr_len;
+
+        if (rules[i].token_type == TK_NOTYPE) {
+          break; // 忽略空格
+        }
+
         if (nr_token >= 32) {
           printf("Error: Too many tokens, tokens array is full.\n");
           return false;
         }
-        /* TODO: Now a new token is recognized with rules[i]. Add codes
-         * to record the token in the array `tokens'. For certain types
-         * of tokens, some extra actions should be performed.
-         */
-        switch (rules[i].token_type) {
-          case num:
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          case '+':
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          case '-':
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          case '*':
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          case '/':
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          case '(':
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          case ')':
-            num_pot = nr_token;
-            tokens[num_pot].type = rules[i].token_type;
-            tokens[num_pot].str[0] = *substr_start;
-            tokens[num_pot].str[1] = '\0';
-            nr_token++;
-            break;
-          default: TODO();
+        
+        /* 记录token */
+        tokens[nr_token].type = rules[i].token_type;
+        
+        // 保存数字的完整值，而不仅仅是第一个字符
+        if (rules[i].token_type == TK_NUM) {
+          if (substr_len >= 32) {
+            printf("Error: Number too long.\n");
+            return false;
+          }
+          strncpy(tokens[nr_token].str, substr_start, substr_len);
+          tokens[nr_token].str[substr_len] = '\0';
+        } else {
+          // 对于操作符，只需要保存一个字符
+          tokens[nr_token].str[0] = *substr_start;
+          tokens[nr_token].str[1] = '\0';
         }
-
+        
+        nr_token++;
         break;
       }
     }
+
     if (i == NR_REGEX) {
       printf("no match at position %d\n%s\n%*.s^\n", position, e, position, "");
       return false;
     }
   }
+  
   return true;
 }
 
-// bool check_parentheses(int start_point, int end_point) {
-//   int left_count = 0;  // 记录'('的数量
-//   int right_count = 0; // 记录')'的数量
-//   int left_most = -1; // 记录第一个'('的位置
-//   int right_most = -1;   // 记录最后一个')'的位置
-//   int size = end_point-start_point+1;
-//   printf("Now is in check,the start_point is : %d, the end_point is : %d\n",start_point,end_point);
-//   // 遍历数组，统计'('和')'的数量，并记录它们的位置
-//   for (int i = start_point; i < size; i++) {
-//     if (tokens[i].str[0] == '(') {
-//       left_count++;
-//       if (left_most == -1) {
-//         left_most = i; // 记录第一个'('的位置
-//       }
-//     } else if (tokens[i].str[0] == ')') {
-//       right_count++;
-//       right_most = i; // 更新最后一个')'的位置
-//     }
-//   }
-
-//   // ① 检查'('和')'的数量是否匹配
-//   assert(left_count == right_count);
-
-//   // ② 检查每个'('是否与最靠近数组末尾的')'匹配
-//   int left_ptr = 0;  // 从左向右扫描
-//   int right_ptr = size - 1; // 从右向左扫描
-//   while (left_ptr <= right_ptr) {
-//     // 找到下一个'('
-//     while (left_ptr <= right_ptr && tokens[left_ptr].str[0] != '(') {
-//       left_ptr++;
-//     }
-//     // 找到下一个')'
-//     while (left_ptr <= right_ptr && tokens[right_ptr].str[0] != ')') {
-//       right_ptr--;
-//     }
-//     // 如果')'的索引小于'('的索引，则assert
-//     if (left_ptr <= right_ptr && right_ptr < left_ptr) {
-//       assert(false);
-//     }
-//     // 匹配成功，继续检查下一对
-//     left_ptr++;
-//     right_ptr--;
-//   }
-
-//   // ③ 检查start_point和end_point位置是否是'('和')'
-//   if (left_most != -1 && right_most != -1 &&
-//       tokens[left_most].str[0] == '(' &&
-//       tokens[right_most].str[0] == ')') {
-//     return true;
-//   }
-
-//   return false;
-// }
-
+// 检查表达式是否被一对括号完整包围
 bool check_parentheses(int start_point, int end_point) {
-  int left_count = 0;  // Count of '('
-  int right_count = 0; // Count of ')'
-  
-  printf("Now is in check, the start_point is: %d, the end_point is: %d\n", start_point, end_point);
-  
-  // Check if the expression starts with '(' and ends with ')'
+  // 如果表达式不是以左括号开始或右括号结束，直接返回false
   if (tokens[start_point].type != '(' || tokens[end_point].type != ')') {
     return false;
   }
   
-  // Check if the outermost brackets match
+  // 检查括号是否匹配
   int bracket_level = 0;
   for (int i = start_point; i <= end_point; i++) {
     if (tokens[i].type == '(') {
-      left_count++;
       bracket_level++;
     } else if (tokens[i].type == ')') {
-      right_count++;
       bracket_level--;
       
-      // If bracket_level becomes 0 before the end, then the expression is not
-      // surrounded by a pair of matching parentheses
+      // 如果在到达end_point之前括号已经完全匹配，则表达式不是被一对括号完整包围
       if (bracket_level == 0 && i != end_point) {
         return false;
       }
     }
     
-    // Bracket level should never go negative
+    // 右括号过多，语法错误
     if (bracket_level < 0) {
-      return false;
+      printf("Syntax error: Unmatched parentheses.\n");
+      assert(0);
     }
   }
   
-  // Check if the number of '(' and ')' are equal
-  if (left_count != right_count) {
-    return false;
-  }
-  
-  // If we reached here, the expression is surrounded by a pair of matching parentheses
-  return true;
+  // 确保括号数量匹配
+  return (bracket_level == 0);
 }
 
-// int find_last_operator(int start_point,int end_point) {
-//   int a = -1; // 最小左括号位置
-//   int b = -1; // 最大右括号位置
-//   int size = end_point - start_point;
-//   // ① 找到最小左括号和最大右括号的位置
-//   for (int i = 0; i < size; i++) {
-//     if (tokens[i].str[0] == '(') {
-//       if (a == -1 || i < a) {
-//         a = i;
-//       }
-//     } else if (tokens[i].str[0] == ')') {
-//       if (b == -1 || i > b) {
-//         b = i;
-//       }
-//     }
-//   }
-
-//   // ② 找到区间外的所有符号，并统计+-和*/的出现次数
-//   int plus_minus_count = 0; // +-的计数
-//   int mul_div_count = 0;    // */的计数
-//   int last_plus_minus_pos = -1; // 最后一个+-符号的位置
-//   int last_mul_div_pos = -1;    // 最后一个*/符号的位置
-
-//   for (int i = 0; i < size; i++) {
-//     // 如果当前位置在区间外
-//     if (i < a || i > b) {
-//       if (tokens[i].str[0] == '+' || tokens[i].str[0] == '-') {
-//         plus_minus_count++;
-//         last_plus_minus_pos = i;
-//       } else if (tokens[i].str[0] == '*' || tokens[i].str[0] == '/') {
-//         mul_div_count++;
-//         last_mul_div_pos = i;
-//       }
-//     }
-//   }
-
-//   // ③ 判断表达式中是否同时存在+-和*/两种运算顺序不同的符号
-//   if (plus_minus_count > 0 && mul_div_count > 0) {
-//     // 同时存在+-和*/，返回最后一个+-符号的位置
-//     return last_plus_minus_pos;
-//   } else if (plus_minus_count > 0) {
-//     // 只有+-，返回最后一个+-符号的位置
-//     return last_plus_minus_pos;
-//   } else if (mul_div_count > 0) {
-//     // 只有*/，返回最后一个*/符号的位置
-//     return last_mul_div_pos;
-//   } else {
-//     // 既没有+-也没有*/，返回-1表示没有符号
-//     return -1;
-//   }
-// }
-
-
-  int find_last_operator(int start_point, int end_point) {
-  int position = -1;
-  int priority = 0;  // Priority: 0 = none, 1 = +/-, 2 = */
+// 查找主操作符
+int find_main_operator(int start_point, int end_point) {
+  int op_position = -1;
+  int priority = 0;  // 优先级: 0=未找到, 1=+/-, 2=*/
   int bracket_level = 0;
   
-  // Scan the expression from left to right
+  // 从左到右扫描表达式
   for (int i = start_point; i <= end_point; i++) {
     if (tokens[i].type == '(') {
       bracket_level++;
     } else if (tokens[i].type == ')') {
       bracket_level--;
     } else if (bracket_level == 0) {
-      // Only consider operators outside of brackets
+      // 只考虑不在括号内的操作符
       if (tokens[i].type == '+' || tokens[i].type == '-') {
-        // +/- has lower precedence, so it should be considered last
-        position = i;
+        // +/- 优先级低，应该最后考虑
+        op_position = i;
         priority = 1;
       } else if ((tokens[i].type == '*' || tokens[i].type == '/') && priority < 1) {
-        // */÷ has higher precedence, only update if we haven't found +/-
-        position = i;
+        // */ 优先级高，只有在没找到 +/- 时更新
+        op_position = i;
         priority = 2;
       }
     }
   }
   
-  return position;
+  return op_position;
 }
 
-static int eval(int start_point,int end_point){
-  printf("Now is caculate :");
-  for (int i = start_point; i < end_point +1; i++)
-  {
-    printf("%s",tokens[i].str);
+// 递归求值函数
+static word_t eval(int start_point, int end_point, bool *success) {
+  if (start_point > end_point) {
+    printf("Error: Bad expression range (%d > %d).\n", start_point, end_point);
+    *success = false;
+    return 0;
   }
-  printf("\n");
-  if ( start_point > end_point){
-    assert("Bad Expression!");
+  
+  // 单个token，必须是数字
+  if (start_point == end_point) {
+    if (tokens[start_point].type == TK_NUM) {
+      return atoi(tokens[start_point].str);
+    } else {
+      printf("Error: Expected number, got operator.\n");
+      *success = false;
+      return 0;
+    }
   }
-  else if (start_point == end_point){
-    return atoi(tokens[start_point].str);
+  
+  // 处理被括号包围的表达式
+  if (check_parentheses(start_point, end_point)) {
+    return eval(start_point + 1, end_point - 1, success);
   }
-  else if (check_parentheses(start_point,end_point) == true){
-    printf("delete the leftmost and rightmost!\n");
-    return eval(start_point + 1, end_point - 1);
+  
+  // 查找主操作符
+  int op_position = find_main_operator(start_point, end_point);
+  
+  // 没有找到主操作符，可能是格式错误
+  if (op_position == -1) {
+    printf("Error: No operator found in expression.\n");
+    *success = false;
+    return 0;
   }
-  else {
-    int op = find_last_operator(start_point,end_point);
-    printf("OUTPUT:get the op is :%s,and op is : %d\n",tokens[op].str,op);
-    int op_type = tokens[op].type;
-    int val1 = eval(start_point,op - 1);
-    printf("OUTPUT:get the val1 is :%d\n",val1);
-    int val2 = eval(op+1, end_point);
-    printf("OUTPUT:get the val2 is :%d\n",val2);
-
-    switch (op_type)
-    {
-    case '+':
-      printf("%d + %d = %d\n",val1,val2,val1 + val2);
-      return val1 + val2;
-      break;
-    case '-':
-      printf("%d - %d = %d\n",val1,val2,val1 - val2);
-      return val1 - val2;
-      break;
-    case '*':
-      printf("%d * %d = %d\n",val1,val2,val1 * val2);
-      return val1 * val2;
-      break;
+  
+  // 获取操作符类型
+  int op_type = tokens[op_position].type;
+  
+  // 递归计算左右子表达式
+  word_t val1 = eval(start_point, op_position - 1, success);
+  if (!*success) return 0;
+  
+  word_t val2 = eval(op_position + 1, end_point, success);
+  if (!*success) return 0;
+  
+  // 执行相应的运算
+  switch (op_type) {
+    case '+': return val1 + val2;
+    case '-': return val1 - val2;
+    case '*': return val1 * val2;
     case '/':
-      printf("%d / %d = %d\n",val1,val2,val1 / val2);
+      if (val2 == 0) {
+        printf("Error: Division by zero.\n");
+        *success = false;
+        return 0;
+      }
       return val1 / val2;
-      break;
-    default:assert(0);
-      break;
-    }
+    default:
+      printf("Error: Unknown operator type %d.\n", op_type);
+      *success = false;
+      return 0;
   }
-  return -1;
-}
-
-// 找到最后一个非空元素的位置
-int find_last_non_empty_token() {
-  for (int i = ARRLEN(tokens) - 1; i >= 0; i--) {
-    if (tokens[i].str[0] != '\0') {
-      return i;
-    }
-  }
-  return -1; // 如果数组全部为空，返回-1
 }
 
 word_t expr(char *e, bool *success) {
+  *success = true;  // 初始化success标志
+  
   if (!make_token(e)) {
     *success = false;
     return 0;
   }
-  printf("Input is :");
-  for (int j = 0; j < ARRLEN(tokens); j++)
-  {
-    printf("%s",tokens[j].str);
+  
+  // 检查表达式是否为空
+  if (nr_token == 0) {
+    printf("Error: Empty expression.\n");
+    *success = false;
+    return 0;
   }
   
-  
+  // 输出解析后的表达式（调试用）
+  printf("Parsed expression: ");
+  for (int i = 0; i < nr_token; i++) {
+    printf("%s", tokens[i].str);
+  }
   printf("\n");
   
-  /* TODO: Insert codes to evaluate the expression. */
-  //TODO();
-  int sum;
-  printf("find_last_non_empty_token() is : %d\n",find_last_non_empty_token());
-  sum = eval(0,find_last_non_empty_token());
-  printf("The caculate result is :%d\n",sum);
-  return 0;
+  // 计算表达式的值
+  word_t result = eval(0, nr_token - 1, success);
+  
+  if (*success) {
+    printf("Result: %u\n", result);
+  }
+  
+  return result;
 }
