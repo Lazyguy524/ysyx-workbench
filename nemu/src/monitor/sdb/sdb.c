@@ -71,17 +71,53 @@ static int cmd_si(char *args) {
 }
 
 static int cmd_info(char *args) {
-  char *arg = strtok(NULL, " ");
-  if (arg == NULL) {
-    printf("Usage: info r or info w\n");
+  if (args == NULL) {
+    printf("Usage: info r - 显示寄存器状态\n");
+    printf("       info w - 显示监视点信息\n");
+    return 0;
+  }
+  
+  if (strcmp(args, "r") == 0) {
+    isa_reg_display();
+  } else if (strcmp(args, "w") == 0) {
+    list_watchpoints();
   } else {
-    if (strcmp(arg, "r") == 0) {
-      isa_reg_display();
-    } else if (strcmp(arg, "w") == 0 ) {
-      /*todo*/
-    } else {
-      printf("Usage: info r or info w\n");
-    }
+    printf("未知的info子命令: %s\n", args);
+  }
+  return 0;
+}
+
+// 添加设置监视点的命令
+static int cmd_w(char *args) {
+  if (args == NULL) {
+    printf("用法: w EXPR - 监视表达式EXPR的值\n");
+    return 0;
+  }
+  
+  // 调用set_watchpoint函数，但不直接访问WP结构的成员
+  bool success = false;
+  int wp_no = set_watchpoint_cmd(args, &success);
+  
+  if (!success) {
+    printf("设置监视点失败\n");
+  } else {
+    printf("监视点 %d: %s\n", wp_no, args);
+  }
+  return 0;
+}
+
+// 添加删除监视点的命令
+static int cmd_d(char *args) {
+  if (args == NULL) {
+    printf("用法: d N - 删除编号为N的监视点\n");
+    return 0;
+  }
+  
+  int NO = atoi(args);
+  if (delete_watchpoint(NO)) {
+    printf("删除监视点 %d 成功\n", NO);
+  } else {
+    printf("未找到编号为 %d 的监视点\n", NO);
   }
   return 0;
 }
@@ -233,8 +269,9 @@ static struct {
   { "x", "Usage: x N EXPR. Scan the memory from EXPR by N bytes", cmd_x },
   { "p", "Usage: p EXPR. Caculate the value of expression", cmd_p },
   { "pp", "Usage: p EXPR. Caculate the value of expression from ./tool/gen-expr/input", cmd_pp },
+  { "w", "Usage: w EXPR. Add a watchpoint on expression", cmd_w },
+  { "d", "Usage: d N. Delete the watchpoint with the number N", cmd_d },
   /* TODO: Add more commands */
-
 };
 
 #define NR_CMD ARRLEN(cmd_table)

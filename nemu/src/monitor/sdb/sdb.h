@@ -20,4 +20,10 @@
 
 word_t expr(char *e, bool *success);
 
+// 更新监视点函数声明，不暴露WP结构体
+bool check_watchpoints();
+int set_watchpoint_cmd(char *expr, bool *success);
+bool delete_watchpoint(int NO);
+void list_watchpoints();
+
 #endif
