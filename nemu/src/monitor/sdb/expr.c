@@ -25,7 +25,7 @@
 #include <memory/vaddr.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ, TK_NUM, TK_UEQ, TK_AND, TK_POINT, TK_REG, TK_DEREF,
+  TK_NOTYPE = 256, TK_EQ, TK_NUM, TK_UEQ, TK_AND, TK_POINT, TK_REG, TK_DEREF, TK_HEX,
 
   /* TODO: Add more token types */
 
@@ -51,6 +51,7 @@ static struct rule {
   {"!=", TK_UEQ},       // Unequal
   {"&&", TK_AND},       // and
   {"\\$[a-zA-Z0-9]+", TK_REG},  // register name
+  {"0[xX][0-9a-fA-F]+", TK_HEX},  // 十六进制数字
   {"[0-9][0-9]*", TK_NUM},   // 使用TK_NUM而不是num，保持一致性
 };
 
@@ -117,7 +118,7 @@ static bool make_token(char *e) {
         tokens[nr_token].type = rules[i].token_type;
         
         // 保存数字的完整值，而不仅仅是第一个字符
-        if (rules[i].token_type == TK_NUM || rules[i].token_type == TK_REG) {
+        if (rules[i].token_type == TK_NUM || rules[i].token_type == TK_HEX || rules[i].token_type == TK_REG) {
           if (substr_len >= 32) {
             printf("Error: Number or register name too long.\n");
             return false;
@@ -242,24 +243,29 @@ static word_t eval(int start_point, int end_point, bool *success) {
   
   // 单个token，必须是数字或寄存器
   if (start_point == end_point) {
-    if (tokens[start_point].type == TK_NUM) {
-      return atoi(tokens[start_point].str);
-    } else if (tokens[start_point].type == TK_REG) {
-      // 调用isa_reg_str2val来获取寄存器的值
-      bool reg_success = true;
-      word_t reg_val = isa_reg_str2val(tokens[start_point].str, &reg_success);
-      if (!reg_success) {
-        printf("Error: Invalid register name '%s'.\n", tokens[start_point].str);
-        *success = false;
-        return 0;
-      }
-      return reg_val;
-    } else {
-      printf("Error: Expected number or register, got operator.\n");
+  if (tokens[start_point].type == TK_NUM) {
+    return atoi(tokens[start_point].str);
+  } else if (tokens[start_point].type == TK_HEX) {
+    // 处理十六进制数字
+    unsigned int value;
+    sscanf(tokens[start_point].str, "%x", &value);
+    return value;
+  } else if (tokens[start_point].type == TK_REG) {
+    // 调用isa_reg_str2val来获取寄存器的值
+    bool reg_success = true;
+    word_t reg_val = isa_reg_str2val(tokens[start_point].str, &reg_success);
+    if (!reg_success) {
+      printf("Error: Invalid register name '%s'.\n", tokens[start_point].str);
       *success = false;
       return 0;
     }
+    return reg_val;
+  } else {
+    printf("Error: Expected number or register, got operator.\n");
+    *success = false;
+    return 0;
   }
+}
   
   // 处理被括号包围的表达式
   if (check_parentheses(start_point, end_point)) {
