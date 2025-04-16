@@ -5,7 +5,7 @@ module ysyx_exu(
     output wire [31:0] rd_data  // 改为wire类型
 );
     reg [31:0] result;
-    
+
     always @(*) begin
         case (alu_op)
             3'b000: begin // ADD

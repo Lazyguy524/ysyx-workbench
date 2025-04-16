@@ -24,6 +24,7 @@
  * You can modify this value as you want.
  */
 #define MAX_INST_TO_PRINT 10
+#define INSTR_RING_SIZE 16
 
 CPU_state cpu = {};
 uint64_t g_nr_guest_inst = 0;
@@ -32,9 +33,78 @@ static bool g_print_step = false;
 
 void device_update();
 
+typedef struct {
+    char buffers[INSTR_RING_SIZE][256];  // 每条指令日志最多256字符
+    int current;  // 当前位置指针
+    int count;    // 已存储的指令数量
+} instr_ring_buffer_t;
+
+// 全局环形缓冲区
+static instr_ring_buffer_t instr_ring = {
+    .current = 0,
+    .count = 0
+};
+
+// 向环形缓冲区添加一条指令记录
+void instr_ring_push(const char* logbuf) {
+    // 复制指令日志到当前位置
+    sprintf(instr_ring.buffers[instr_ring.current], "%s", logbuf);
+    
+    // 更新位置指针
+    instr_ring.current = (instr_ring.current + 1) % INSTR_RING_SIZE;
+    
+    // 更新计数
+    if (instr_ring.count < INSTR_RING_SIZE) {
+        instr_ring.count++;
+    }
+}
+
+// 在发生错误时打印最近的指令
+void print_recent_instrs(void) {
+    printf("Recent instructions:\n");
+    
+    // 计算起始位置
+    int start = (instr_ring.count < INSTR_RING_SIZE) 
+                ? 0 
+                : (instr_ring.current + INSTR_RING_SIZE - instr_ring.count) % INSTR_RING_SIZE;
+    
+    for (int i = 0; i < instr_ring.count; i++) {
+        int idx = (start + i) % INSTR_RING_SIZE;
+        char *log = instr_ring.buffers[idx];
+        
+        // 解析原始日志格式
+        char pc_str[20] = {0};
+        unsigned char bytes[4];
+        char mnemonic[100] = {0};
+        
+        // 尝试从日志中提取PC和字节信息
+        if (sscanf(log, "%s %hhx %hhx %hhx %hhx %[^\n]", 
+                   pc_str, &bytes[0], &bytes[1], &bytes[2], &bytes[3], mnemonic) >= 5) {
+            
+            // 重新格式化输出，减小第一个字节和后三个字节之间的间距
+            if (i == instr_ring.count - 1) {
+                printf("--> %s: %02x %02x %02x %02x %s\n", 
+                       pc_str, bytes[0], bytes[1], bytes[2], bytes[3], mnemonic);
+            } else {
+                printf("    %s: %02x %02x %02x %02x %s\n", 
+                       pc_str, bytes[0], bytes[1], bytes[2], bytes[3], mnemonic);
+            }
+        } else {
+            // 如果无法解析，则直接打印原始日志
+            if (i == instr_ring.count - 1) {
+                printf("--> %s\n", log);
+            } else {
+                printf("    %s\n", log);
+            }
+        }
+    }
+    
+    printf("Complete instruction trace available in log file.\n");
+}
+
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE_COND
-  if (ITRACE_COND) { log_write("%s\n", _this->logbuf); }
+  if (ITRACE_COND) { log_write("%s\n", _this->logbuf);  instr_ring_push(_this->logbuf);}
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
   IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));

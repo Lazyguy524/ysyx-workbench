@@ -17,6 +17,9 @@
 #include <cpu/ifetch.h>
 #include <isa.h>
 #include <cpu/difftest.h>
+#include <cpu/cpu.h>
+
+void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
 
 void set_nemu_state(int state, vaddr_t pc, int halt_ret) {
   difftest_skip_ref();
@@ -31,13 +34,34 @@ void invalid_inst(vaddr_t thispc) {
   vaddr_t pc = thispc;
   temp[0] = inst_fetch(&pc, 4);
   temp[1] = inst_fetch(&pc, 4);
-
   uint8_t *p = (uint8_t *)temp;
+  
+  // 创建错误指令的日志条目
+  char error_log[256];
+  char disasm_buf[128];  // 用于存储反汇编结果
+  char *ptr = error_log;
+  
+  // 添加PC和指令字节（格式与正常指令日志一致）
+  ptr += sprintf(ptr, FMT_WORD ":", thispc);
+  
+  // 添加指令字节
+  for (int i = 0; i < 4; i++) {
+    ptr += sprintf(ptr, " %02x", p[i]);
+  }
+  
+  // 使用disassemble函数获取指令描述
+  disassemble(disasm_buf, sizeof(disasm_buf), thispc, p, 4);
+  
+  // 添加空格和指令描述
+  ptr += sprintf(ptr, " %s", disasm_buf);
+  
+  // 添加到环形缓冲区
+  instr_ring_push(error_log);
+  
   printf("invalid opcode(PC = " FMT_WORD "):\n"
       "\t%02x %02x %02x %02x %02x %02x %02x %02x ...\n"
       "\t%08x %08x...\n",
       thispc, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], temp[0], temp[1]);
-
   printf("There are two cases which will trigger this unexpected exception:\n"
       "1. The instruction at PC = " FMT_WORD " is not implemented.\n"
       "2. Something is implemented incorrectly.\n", thispc);
@@ -46,6 +70,7 @@ void invalid_inst(vaddr_t thispc) {
         "If it is the second case, remember:\n"
         "* The machine is always right!\n"
         "* Every line of untested code is always wrong!\n\n", ANSI_FG_RED), isa_logo);
-
+  
+  print_recent_instrs();
   set_nemu_state(NEMU_ABORT, thispc, -1);
 }
