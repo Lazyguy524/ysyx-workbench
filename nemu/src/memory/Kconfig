@@ -38,4 +38,11 @@ config MTRACE
     Enable this to trace memory access operations(read/write).
     You can see memory access details during program execution.
 
+config FTRACE
+  bool "Enable function tracing"
+  default y
+  help
+    Enable this to trace function calls.
+    You can see function call details during program execution.
+
 endmenu #MEMORY

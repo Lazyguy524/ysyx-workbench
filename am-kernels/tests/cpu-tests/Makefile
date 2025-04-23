@@ -1,3 +1,5 @@
+ELFFILE ?= # 默认为空
+
 .PHONY: all run gdb clean latest $(ALL)
 
 RESULT = .result

@@ -23,11 +23,11 @@ int is_exit_status_bad();
 int main(int argc, char *argv[]) {
   /* Initialize the monitor. */
 #ifdef CONFIG_TARGET_AM
-  printf("CONFIG_TARGET_AM is defined!\n");
   am_init_monitor();
+  printf("NEMU is running in AM mode.\n");
 #else
-  printf("CONFIG_TARGET_AM is NOT defined!\n");
   init_monitor(argc, argv);
+  printf("NEMU is running in NEMU mode.\n");
 #endif
 
   /* Start engine. */
