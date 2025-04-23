@@ -31,4 +31,11 @@ config MEM_RANDOM
   help
     This may help to find undefined behaviors.
 
+config MTRACE
+  bool "Enable memmory access tracing"
+  default n
+  help 
+    Enable this to trace memory access operations(read/write).
+    You can see memory access details during program execution.
+
 endmenu #MEMORY
