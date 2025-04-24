@@ -131,11 +131,12 @@ void init_monitor(int argc, char *argv[]) {
   /* Initialize the simple debugger. */
   init_sdb();
 
-  printf("ELF file: %s\n", elf_file);
-  if(elf_file) {
+  #ifdef CONFIG_FTRACE
+    if(elf_file) {
     init_ftrace(elf_file);
     printf("ELF file loaded successfully!\n");
-  }
+    }
+  #endif
 
   IFDEF(CONFIG_ITRACE, init_disasm());
 

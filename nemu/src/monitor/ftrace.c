@@ -94,48 +94,48 @@ static long load_elf() {
   
   // 检查 ELF 文件路径
   if (elf_file == NULL) {
-    Log("No ELF file specified. Function tracing will be disabled.");
+    Log("No ELF file specified. Function tracing will be disabled.\n");
     return 0;
   }
   
-  Log("Loading ELF file: %s", elf_file);
+  Log("Loading ELF file: %s\n", elf_file);
   
   // 打开 ELF 文件
   fd = open(elf_file, O_RDONLY, 0);
   if (fd < 0) {
-    Log("Cannot open ELF file '%s': %s", elf_file, strerror(errno));
+    Log("Cannot open ELF file '%s': %s\n", elf_file, strerror(errno));
     return 0;
   }
   
   // 初始化 ELF 库
   if (elf_version(EV_CURRENT) == EV_NONE) {
-    Log("ELF library initialization failed: %s", elf_errmsg(-1));
+    Log("ELF library initialization failed: %s\n", elf_errmsg(-1));
     goto cleanup;
   }
   
   // 开始 ELF 处理
   elf = elf_begin(fd, ELF_C_READ, NULL);
   if (elf == NULL) {
-    Log("elf_begin() failed: %s", elf_errmsg(-1));
+    Log("elf_begin() failed: %s\n", elf_errmsg(-1));
     goto cleanup;
   }
   
   // 读取 ELF 头
   if (gelf_getehdr(elf, &ehdr) == NULL) {
-    Log("Failed to get ELF header: %s", elf_errmsg(-1));
+    Log("Failed to get ELF header: %s\n", elf_errmsg(-1));
     goto cleanup;
   }
   
   // 验证文件是否为 RISC-V ELF
   if (ehdr.e_machine != EM_RISCV) {
-    Log("Warning: ELF file is not for RISC-V architecture (machine type: %d)", ehdr.e_machine);
+    Log("Warning: ELF file is not for RISC-V architecture (machine type: %d)\n", ehdr.e_machine);
     // 不要退出，因为这可能只是一个警告
   }
   
   // 寻找符号表
   while ((scn = elf_nextscn(elf, scn)) != NULL) {
     if (gelf_getshdr(scn, &shdr) == NULL) {
-      Log("Failed to get section header: %s", elf_errmsg(-1));
+      Log("Failed to get section header: %s\n", elf_errmsg(-1));
       continue;
     }
     
@@ -145,24 +145,24 @@ static long load_elf() {
       char *section_name = elf_strptr(elf, ehdr.e_shstrndx, shdr.sh_name);
       
       if (section_name) {
-        Log("Found symbol table section: %s", section_name);
+        Log("Found symbol table section: %s\n", section_name);
       }
       
       data = elf_getdata(scn, data);
       if (data == NULL) {
-        Log("Failed to get section data: %s", elf_errmsg(-1));
+        Log("Failed to get section data: %s\n", elf_errmsg(-1));
         continue;
       }
       
       symcount = shdr.sh_size / shdr.sh_entsize;
-      Log("Symbol table contains %d entries", symcount);
+      Log("Symbol table contains %d entries\n", symcount);
       
       // 遍历符号表
       for (int i = 0; i < symcount; i++) {
         GElf_Sym sym;
         
         if (gelf_getsym(data, i, &sym) == NULL) {
-          Log("Failed to get symbol at index %d: %s", i, elf_errmsg(-1));
+          Log("Failed to get symbol at index %d: %s\n", i, elf_errmsg(-1));
           continue;
         }
         
@@ -176,12 +176,12 @@ static long load_elf() {
             func_count++;
             
             if (func_count <= 10) { // 只打印前10个函数，避免日志过多
-              Log("Found function: %s at 0x%lx, size: %lu", 
+              Log("Found function: %s at 0x%lx, size: %lu\n", 
                   name, (unsigned long)sym.st_value, (unsigned long)sym.st_size);
             }
           } else if (name != NULL) {
             // 函数没有大小或者其他问题
-            Log("Skipping function: %s (invalid size: %lu)", 
+            Log("Skipping function: %s (invalid size: %lu)\n", 
                 name, (unsigned long)sym.st_size);
           }
         }
@@ -193,9 +193,9 @@ static long load_elf() {
   }
   
   if (func_count > 0) {
-    Log("Successfully loaded %d functions from ELF file", func_count);
+    Log("Successfully loaded %d functions from ELF file\n", func_count);
   } else {
-    Log("No valid function symbols found in ELF file");
+    Log("No valid function symbols found in ELF file\n");
   }
   
 cleanup:
@@ -218,7 +218,7 @@ bool init_ftrace(const char *filename) {
   
   long symcount = load_elf();
   if (symcount > 0) {
-    Log("Successfully loaded %ld function symbols from ELF file", symcount);
+    Log("Successfully loaded %ld function symbols from ELF file\n", symcount);
     return true;
   }
   

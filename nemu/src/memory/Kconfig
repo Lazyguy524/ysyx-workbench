@@ -40,7 +40,7 @@ config MTRACE
 
 config FTRACE
   bool "Enable function tracing"
-  default y
+  default n
   help
     Enable this to trace function calls.
     You can see function call details during program execution.
