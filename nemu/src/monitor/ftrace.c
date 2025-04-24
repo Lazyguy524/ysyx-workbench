@@ -61,24 +61,25 @@ void set_ret_flag(bool flag) {
   is_ret = flag;
 }
 
-// 函数调用检测
 void func_called_detect(uint32_t pc) {
   char* func_name = get_func_name(pc);
-  if(func_name != NULL && last_func_name != func_name) {
+  
+  // 只有当目标地址能解析到函数名时才处理
+  if(func_name != NULL) {
     if(is_ret) {
-      printf("ret  ");
-      is_ret = false;
+      // 对于返回指令，减少缩进并显示返回信息
       if (stack_num > 0) stack_num--;
+      printf("0x%08x: %*sret  [%s]\n", pc, stack_num * 2, "", func_name);
+      is_ret = false;
     }
-    else {
-      printf("call ");
+    else if(last_func_name != func_name) {  // 避免连续多次调用同一函数时重复输出
+      // 这是一个函数调用
+      printf("0x%08x: %*scall [%s@0x%08x]\n", pc, stack_num * 2, "", func_name, pc);
       stack_num++;
     }
-
-    for(int i = 0; i < stack_num; i++) printf(" ");
-    printf("[%s]\n", func_name);
+    
+    last_func_name = func_name;
   }
-  last_func_name = func_name;
 }
 
 // 加载 ELF 文件并提取函数符号信息

@@ -23,6 +23,8 @@
 #define Mr vaddr_read
 #define Mw vaddr_write
 
+int call_depth = 0;
+
 enum {
   TYPE_I, TYPE_U, TYPE_S, TYPE_J, TYPE_R, TYPE_B,
   TYPE_N, // none
@@ -74,31 +76,71 @@ static int decode_exec(Decode *s) {
   INSTPAT_START();
   INSTPAT("??????? ????? ????? ??? ????? 01101 11", lui    , U, R(rd) = imm);
   INSTPAT("??????? ????? ????? ??? ????? 00101 11", auipc  , U, R(rd) = s->pc + imm);
-  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal    , J, s->dnpc = s->pc + imm; R(rd) = s->snpc);
-  INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr   , I, s->dnpc = (src1 + imm) & ~1ull; R(rd) = s->pc +4);
+  // INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal    , J, s->dnpc = s->pc + imm; R(rd) = s->snpc);
+  // INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr   , I, s->dnpc = (src1 + imm) & ~1ull; R(rd) = s->pc +4;);
 
   // INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J,
+  //   word_t old_pc = s->pc;
   //   R(rd) = s->pc + 4;
   //   s->dnpc = s->pc + imm;
-  //   IFDEF(CONFIG_FTRACE, {
-  //     if (rd == 1) {  // ra寄存器，用于函数调用
-  //       func_called_detect(s->pc, s->dnpc);
-  //     }
-  //   });
+  //   call_depth++;
+  //   char *function_name = get_func_name(s->dnpc);
+  //   printf("0x%08X: %*scall [%s@0x%08X]\n", 
+  //         old_pc, (call_depth - 1) * 2, "", 
+  //         function_name ? function_name : "unknown", s->dnpc);
   // );
 
-  // INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I,
+  // INSTPAT("??????? ????? ????? ??? ????? 11001 11", jalr, I,
+  //   int rs1 = BITS(s->isa.inst, 19, 15);
+  //   word_t old_pc = s->pc;
   //   R(rd) = s->pc + 4;
   //   s->dnpc = (src1 + imm) & (~1);
-  //   IFDEF(CONFIG_FTRACE, {
-  //     if (INSTPAT_INST(s) == 0x00008067) {  // ret指令的机器码
-  //       set_ret_flag(true);
-  //       func_called_detect(s->pc, s->dnpc);
-  //     } else if (rd == 1) {  // 函数调用
-  //       func_called_detect(s->pc, s->dnpc);
-  //     }
-  //   });
+    
+  //   if (rs1 == 1 && rd == 0) {  // 更好地检测函数返回：ra作为源，rd通常为x0
+  //     call_depth = call_depth > 0 ? call_depth - 1 : 0; // 防止深度变为负数
+  //     char *function_name = get_func_name(s->dnpc);
+  //     printf("0x%08X: %*sret  [%s]\n", 
+  //           old_pc, call_depth * 2, "", 
+  //           function_name ? function_name : "unknown");
+  //   } else {
+  //     // 这是一个普通跳转或调用
+  //     call_depth++;
+  //     char *function_name = get_func_name(s->dnpc);
+  //     printf("0x%08X: %*scall [%s@0x%08X]\n", 
+  //           old_pc, (call_depth - 1) * 2, "", 
+  //           function_name ? function_name : "unknown", s->dnpc);
+  //   }
   // );
+
+    // 在jalr指令处理中正确识别返回
+  INSTPAT("??????? ????? ????? ??? ????? 11001 11", jalr, I,
+    int rs1 = BITS(s->isa.inst, 19, 15);
+    // word_t old_pc = s->pc;
+    R(rd) = s->pc + 4;
+    s->dnpc = (src1 + imm) & (~1);
+    
+    // 典型的函数返回模式：jalr x0, 0(ra)
+    if (rs1 == 1 && rd == 0) {  // ra作为源，rd为x0
+      set_ret_flag(true);  // 标记这是一个返回指令
+      // 不增加call_depth，而是在func_called_detect中减少stack_num
+    } else {
+      set_ret_flag(false);  // 这不是返回指令
+      // func_called_detect中会增加stack_num
+    }
+    
+    // 调用函数检测处理
+    func_called_detect(s->dnpc);
+  );
+
+  // 对于jal指令，总是视为函数调用
+  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J,
+    // word_t old_pc = s->pc;
+    R(rd) = s->pc + 4;
+    s->dnpc = s->pc + imm;
+    
+    set_ret_flag(false);  // 这不是返回指令
+    func_called_detect(s->dnpc);
+  );
 
   INSTPAT("??????? ????? ????? 000 ????? 11000 11", beq    , B, s->dnpc = (src1 == src2)? s->pc + imm : s->snpc);
   INSTPAT("??????? ????? ????? 001 ????? 11000 11", bne    , B, s->dnpc = (src1 != src2)? s->pc + imm : s->snpc);
